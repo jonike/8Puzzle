@@ -8,8 +8,7 @@
  */
 
 public class Solver {
-    private final SearchNode initialSN; 
-    private SearchNode goalSN;
+    private SearchNode result;
     
     // Search Node implementation
     private class SearchNode implements Comparable<SearchNode> {
@@ -17,10 +16,11 @@ public class Solver {
         private final SearchNode prev;
         private final int move, priority;
         
-        public SearchNode(Board board, SearchNode prev, int move) {
+        public SearchNode(Board board, SearchNode prev) {
             this.board = board;
             this.prev = prev;
-            this.move = move;
+            if (prev == null) move = 0;
+            else move = prev.move + 1;
             priority = board.manhattan() + move;
         }
         
@@ -28,94 +28,73 @@ public class Solver {
             return this.priority - that.priority;
         }
         
-        public boolean equals(Object y) {
-            if (y == this) return true;
-            if (y == null) return false;
-            if (y.getClass() != this.getClass())
-                return false;
-        
-            SearchNode that = (SearchNode) y;
-            return this.board.equals(that.board);
-        }
-        
         public boolean isGoal() {
             return board.isGoal();
         }
         
         public SearchNode twin() {
-            return new SearchNode(board.twin(), prev, move);
-        }
-        
-        public Iterable<SearchNode> neighbors() {  
-            Queue<SearchNode> queue = new Queue<>();
-            for (Board b: board.neighbors()) {
-                SearchNode curr = new SearchNode(b, this, move+1);
-                if (!curr.equals(this.prev)) queue.enqueue(curr); 
-            }
-            return queue;
+            return new SearchNode(board.twin(), prev);
         }
     }
     
     // find a solution to the initial board (using the A* algorithm)
     public Solver(Board initial) {
-        initialSN = new SearchNode(initial, null, 0);
-        
         // run solver
-        solveIt();
+        result = solveIt(new SearchNode(initial, null));
     }    
     
-    private void solveIt() {        
-        SearchNode currSN = initialSN;
+    private SearchNode calculateOneStep(MinPQ<SearchNode> pq) {
+        SearchNode least = pq.delMin();
+        for (Board neighbor : least.board.neighbors()) {
+            if (least.prev == null || !neighbor.equals(least.prev.board))
+                pq.insert(new SearchNode(neighbor, least));
+        }
+        return least;
+    }
+    
+    private SearchNode solveIt(SearchNode initial) {        
+        SearchNode last = initial;
         MinPQ<SearchNode> snQueue = new MinPQ<>();
-        snQueue.insert(currSN);
+        snQueue.insert(last);
         
-        SearchNode twinSN = initialSN.twin();
         MinPQ<SearchNode> twinQueue = new MinPQ<>();
-        twinQueue.insert(twinSN);
+        twinQueue.insert(initial.twin());        
         
-        while (!currSN.isGoal() && !twinSN.isGoal()) {            
-            for (SearchNode node : currSN.neighbors())
-                snQueue.insert(node);
-            currSN = snQueue.delMin();
+        while (true) {            
+            last = calculateOneStep(snQueue);
+            if (last.isGoal()) return last;
             
             // solve twin search node            
-            for (SearchNode node : twinSN.neighbors())
-                twinQueue.insert(node);
-            twinSN = twinQueue.delMin();
+            if (calculateOneStep(twinQueue).isGoal()) return null;
         }
-        goalSN = currSN;
     }
     
     // is the initial board solvable?
     public boolean isSolvable() {        
-        return goalSN.isGoal();
+        return result != null;
     }  
     
     // min number of moves to solve initial board; -1 if no solution
     public int moves() {
-        if (isSolvable()) return goalSN.move;
+        if (isSolvable()) return result.move;
         return -1;
     }  
     
     // sequence of boards in a shortest solution; null if no solution
     public Iterable<Board> solution() {
-        if (!isSolvable()) return null;
-        
-        SearchNode currSN = goalSN;
-        Stack<Board> stepQueue = new Stack<>();
-        while (currSN.prev != null) {
-            stepQueue.push(currSN.board);
-            currSN = currSN.prev;
+        if (!isSolvable()) return null;        
+        Stack<Board> s = new Stack<>();
+        for (SearchNode n = result; n != null; n = n.prev) {
+            s.push(n.board);
         }
-        stepQueue.push(initialSN.board);
-        return stepQueue;
+        return s;
     }
     
     // solve a slider puzzle (given below)   
     public static void main(String[] args) {
         // create initial board from file
         In in = new In(args[0]);
-        //String path = "E:/Coursera/Algorithms, Part I/Week 4/Assignment/8puzzle/src/puzzle30.txt";
+        //String path = "E:/Coursera/Algorithms, Part I/Week 4/Assignment/8puzzle/src/puzzle34.txt";
         //In in = new In(path);
         int N = in.readInt();
         int[][] blocks = new int[N][N];
@@ -123,9 +102,11 @@ public class Solver {
             for (int j = 0; j < N; j++)
                 blocks[i][j] = in.readInt();
         Board initial = new Board(blocks);
+        
+        Stopwatch time1 = new Stopwatch();
 
         // solve the puzzle
-        Solver solver = new Solver(initial);
+        Solver solver = new Solver(initial);        
 
         // print solution to standard output
         if (!solver.isSolvable())
@@ -135,6 +116,7 @@ public class Solver {
             for (Board board : solver.solution())
                 StdOut.println(board);
         }
+        StdOut.println("Time escape:   " + time1.elapsedTime());
     }
             
 }

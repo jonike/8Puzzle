@@ -11,19 +11,33 @@ import java.util.Arrays;
 
 public class Board {
     private final char[] tiles;
-    private int N;
+    private int N, mht;
     
     // construct a board from an N-by-N array of blocks
     // (where blocks[i][j] = block in row i, column j)
     public Board(int[][] blocks) {
         tiles = copy2DArrayTo1DChar(blocks);
         N = blocks.length;
+        cachedManhattan();
     }          
     
     // board dimension N
     public int dimension() {
         return N;
     }  
+    
+    private void cachedManhattan() {
+        int count = 0;
+        for (int i = 0; i < N*N; i++) {
+            int v = tiles[i];
+            if (v != 0) {
+                int step = Math.abs(i / N - (v-1) / N) 
+                         + Math.abs(i % N - (v-1) % N);
+                count += step;
+            }
+        }
+        mht = count;
+    }
     
     // number of blocks out of place
     public int hamming() {
@@ -38,16 +52,7 @@ public class Board {
     
     // sum of Manhattan distances between blocks and goal
     public int manhattan() {
-        int count = 0;
-        for (int i = 0; i < N*N; i++) {
-            int v = tiles[i];
-            if (v != 0) {
-                int step = Math.abs(i / N - (v-1) / N) 
-                         + Math.abs(i % N - (v-1) % N);
-                count += step;
-            }
-        }
-        return count;
+        return mht;
     }    
     
     // is this board the goal board?
